@@ -2,10 +2,9 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 import shutil
 import os
-
 from pdf_processor import extract_text_from_pdf, chunk_text
 from vector_store import add_chunks_to_db
-from rag_chatbot import ask_question
+from rag_chatbot import ask_question, compare_models
 
 app = FastAPI(title = "RAG Chatbot API")
 
@@ -15,6 +14,10 @@ class QuestionRequest(BaseModel):
 
 class AnswerResponse(BaseModel):
     answer: str
+
+class CompareModelsResponse(BaseModel):
+    question: str
+    results: list[dict]
 
 @app.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
@@ -40,6 +43,17 @@ async def upload_pdf(file: UploadFile = File(...)):
 async def ask(request: QuestionRequest):
     answer = ask_question(request.question, document_name=request.document_name)
     return AnswerResponse(answer=answer)
+
+@app.post("/compare-models", response_model=CompareModelsResponse)
+async def compare(request: QuestionRequest):
+    """So sánh câu trả lời + thời gian phản hồi giữa nhiều model Gemini"""
+    
+    results = compare_models(request.question, document_name=request.document_name)
+    
+    return CompareModelsResponse(
+        question=request.question,
+        results=results
+    )
 
 @app.get("/")
 async def root():
